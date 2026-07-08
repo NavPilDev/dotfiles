@@ -53,12 +53,14 @@ else (formulae, taps, npm globals) installs the same way via Linuxbrew.
 
 ### Windows
 
-Open PowerShell **as Administrator** (needed to create symlinks — or enable
-Developer Mode instead, see below) and run:
+Open **PowerShell** — not Command Prompt; `$env:USERPROFILE` below is
+PowerShell-only syntax and cmd.exe will create a folder literally named
+`$env:USERPROFILE` instead of expanding it — **as Administrator** (needed to
+create symlinks — or enable Developer Mode instead, see below) and run:
 
 ```powershell
-git clone https://github.com/NavPilDev/dotfiles.git $HOME\.dotfiles
-cd $HOME\.dotfiles
+git clone https://github.com/NavPilDev/dotfiles.git $env:USERPROFILE\.dotfiles
+cd $env:USERPROFILE\.dotfiles
 .\install.ps1
 ```
 
