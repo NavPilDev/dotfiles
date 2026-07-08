@@ -5,6 +5,8 @@ if wezterm.config_builder then
 	config = wezterm.config_builder()
 end
 
+config.front_end = "OpenGL"
+config.prefer_egl = true
 config.default_cursor_style = "SteadyBar"
 config.automatically_reload_config = true
 config.window_close_confirmation = "NeverPrompt"
