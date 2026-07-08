@@ -1,4 +1,5 @@
 # dotfiles
+<img width="1508" height="950" alt="image" src="https://github.com/user-attachments/assets/902fbb39-93f6-46f6-a533-0ad169b13c87" />
 
 Personal configs for shell, editor, prompt, and terminal, plus a Homebrew
 package list — set up so a fresh machine can be brought up in one command.
