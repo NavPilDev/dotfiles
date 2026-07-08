@@ -4,7 +4,8 @@
 #   1. Installs Homebrew (if missing)
 #   2. Installs packages from Brewfile (casks/VS Code extensions are
 #      macOS-only and are skipped on Linux)
-#   3. Symlinks configs into place, backing up anything that already exists
+#   3. Symlinks configs into ~/.config, backing up anything that already
+#      exists, so nothing further is needed for tools to pick them up
 #
 # Usage: ./install.sh
 set -euo pipefail
@@ -70,10 +71,26 @@ install_packages() {
   fi
 }
 
+migrate_legacy() {
+  # Earlier versions of this script (or a plain, pre-existing dotfile) put
+  # git/zsh config directly in $HOME. Clear those out of the way (backed up,
+  # not deleted) so they can't shadow the XDG locations below - git and zsh
+  # both prefer a $HOME-level file over the ~/.config one if both exist.
+  for legacy in "$HOME/.gitconfig" "$HOME/.zshrc"; do
+    if [ -e "$legacy" ] || [ -L "$legacy" ]; then
+      mkdir -p "$BACKUP_DIR"
+      info "Moving legacy $legacy out of the way -> $BACKUP_DIR/"
+      mv "$legacy" "$BACKUP_DIR/"
+    fi
+  done
+}
+
 symlink_dotfiles() {
-  info "Symlinking dotfiles"
-  link "$DOTFILES_DIR/.gitconfig" "$HOME/.gitconfig"
-  link "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
+  info "Symlinking dotfiles into ~/.config"
+  migrate_legacy
+  link "$DOTFILES_DIR/.gitconfig" "$HOME/.config/git/config"
+  link "$DOTFILES_DIR/.zshenv" "$HOME/.zshenv"
+  link "$DOTFILES_DIR/.zshrc" "$HOME/.config/zsh/.zshrc"
   link "$DOTFILES_DIR/starship.toml" "$HOME/.config/starship.toml"
   link "$DOTFILES_DIR/wezterm/wezterm.lua" "$HOME/.config/wezterm/wezterm.lua"
   link "$DOTFILES_DIR/nvim" "$HOME/.config/nvim"
@@ -91,7 +108,7 @@ install_packages
 symlink_dotfiles
 check_default_shell
 
-info "Done. Open a new terminal (or WezTerm window) to see the changes."
+info "Done. Everything now lives under ~/.config - open a new terminal (or WezTerm window) to pick up the changes, no further action needed."
 if [ -d "$BACKUP_DIR" ]; then
   info "Pre-existing files were backed up to: $BACKUP_DIR"
 fi
