@@ -92,10 +92,10 @@ cd ~/.dotfiles
 
 ## What the scripts do
 
-Both installers print an overall progress bar (`install.sh`: a step counter
-in the terminal; `install.ps1`: a native PowerShell progress bar, plus a
-nested one for the winget package loop) so you can tell where setup is at
-without reading through the package-manager output.
+Both installers pin an overall progress bar to the last row of the terminal
+(via a scroll region), so `brew`'s and `winget`'s own download progress bars
+keep scrolling normally above it instead of burying it. Falls back to plain
+step-by-step log lines on terminals without VT/ANSI support.
 
 Both installers are idempotent and safe to re-run:
 

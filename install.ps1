@@ -30,13 +30,52 @@ $ConfigHome = Join-Path $env:USERPROFILE ".config"
 function Info($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Warn($msg) { Write-Host "!! $msg" -ForegroundColor Yellow }
 
+# Overall progress is pinned to the last row of the console via a scroll
+# region (same ANSI/VT approach as install.sh's footer), so winget's own
+# download progress bars keep scrolling normally above it. Write-Progress
+# was tried first, but hosts pin it near the top, not the bottom - and it
+# can't be told otherwise. Falls back to plain log lines on hosts without
+# VT support (older Windows PowerShell 5.1 outside Windows Terminal).
+$Esc = [char]27
+$SupportsAnsi = ($PSVersionTable.PSVersion.Major -ge 6) -or [bool]$env:WT_SESSION -or [bool]$env:TERM_PROGRAM
+
+function Get-ConsoleHeight {
+    try { return $Host.UI.RawUI.WindowSize.Height } catch { return 0 }
+}
+
+function Initialize-Footer {
+    if (-not $SupportsAnsi) { return }
+    $h = Get-ConsoleHeight
+    if ($h -lt 3) { $script:SupportsAnsi = $false; return }
+    Write-Host -NoNewline "$Esc[1;$($h - 1)r$Esc[$($h - 1);1H"
+}
+
+function Reset-Footer {
+    if (-not $SupportsAnsi) { return }
+    $h = Get-ConsoleHeight
+    if ($h -lt 1) { return }
+    Write-Host -NoNewline "$Esc[1;${h}r$Esc[$h;1H$Esc[2K"
+}
+
+function Write-Footer([string]$Text) {
+    if (-not $SupportsAnsi) {
+        Info $Text
+        return
+    }
+    $h = Get-ConsoleHeight
+    Write-Host -NoNewline "$Esc[s$Esc[$h;1H$Esc[2K$Text$Esc[u"
+}
+
 $TotalSteps = 3
 $script:CurrentStep = 0
 function Step($label) {
     $script:CurrentStep++
+    $width = 30
+    $filled = [int]($script:CurrentStep * $width / $TotalSteps)
+    $bar = ("#" * $filled).PadRight($width, "-")
     $pct = [int](($script:CurrentStep / $TotalSteps) * 100)
-    Write-Progress -Id 0 -Activity "Dotfiles setup" -Status "[$($script:CurrentStep)/$TotalSteps] $label" -PercentComplete $pct
     Info "[$($script:CurrentStep)/$TotalSteps] $label"
+    Write-Footer "[$bar] $pct% - Step $($script:CurrentStep)/$TotalSteps`: $label"
 }
 
 function Test-Admin {
@@ -92,16 +131,13 @@ function Install-Packages {
 
     for ($i = 0; $i -lt $packages.Count; $i++) {
         $pkg = $packages[$i]
-        $pkgPct = [int]((($i + 1) / $packages.Count) * 100)
-        Write-Progress -Id 1 -ParentId 0 -Activity "Installing packages" -Status "$pkg ($($i + 1)/$($packages.Count))" -PercentComplete $pkgPct
-        Info "winget install $pkg"
+        Info "winget install $pkg ($($i + 1)/$($packages.Count))"
         try {
             winget install --id $pkg -e --source winget --accept-package-agreements --accept-source-agreements
         } catch {
             Warn "Failed to install $pkg (it may already be installed, or the winget id may have changed - try 'winget search <name>'). $_"
         }
     }
-    Write-Progress -Id 1 -Activity "Installing packages" -Completed
 
     if (Get-Command code -ErrorAction SilentlyContinue) {
         Info "Installing VS Code extensions from Brewfile"
@@ -152,16 +188,21 @@ if (-not (Test-Admin)) {
     Warn "Not running as Administrator. Symlink creation will fail unless Developer Mode is enabled (Settings > Update & Security > For developers)."
 }
 
-Step "Setting XDG_CONFIG_HOME"
-Set-XdgConfigHome
+Initialize-Footer
+try {
+    Step "Setting XDG_CONFIG_HOME"
+    Set-XdgConfigHome
 
-Step "Installing packages via winget"
-Install-Packages
+    Step "Installing packages via winget"
+    Install-Packages
 
-Step "Symlinking dotfiles"
-Set-Symlinks
-
-Write-Progress -Id 0 -Activity "Dotfiles setup" -Completed
+    Step "Symlinking dotfiles"
+    Set-Symlinks
+} finally {
+    # Always restore the console's scroll region, even on error/Ctrl-C,
+    # otherwise the last row stays reserved for the rest of the session.
+    Reset-Footer
+}
 
 Info "Done. Everything now lives under $ConfigHome - open a new terminal (or WezTerm window) to pick up the changes, no further action needed."
 Info "Note: .zshrc, zsh-autosuggestions, zsh-syntax-highlighting and tmux are POSIX-shell tools and are not set up here. Use WSL + install.sh if you want those too."

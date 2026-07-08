@@ -16,6 +16,44 @@ BACKUP_DIR="$HOME/.dotfiles-backup/$(date +%Y%m%d-%H%M%S)"
 info() { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$1"; }
 
+# Overall progress is pinned to the last row of the terminal via a scroll
+# region (DECSTBM), so brew/curl's own download progress bars keep scrolling
+# normally above it instead of the overall bar getting buried by them.
+IS_TTY=0
+if [ -t 1 ] && [ -n "${TERM:-}" ] && [ "$TERM" != "dumb" ] && command -v tput >/dev/null 2>&1; then
+  IS_TTY=1
+fi
+
+footer_init() {
+  [ "$IS_TTY" = 1 ] || return
+  local lines; lines="$(tput lines)"
+  [ "$lines" -gt 2 ] || { IS_TTY=0; return; }
+  tput csr 0 $((lines - 2))
+  tput cup $((lines - 2)) 0
+}
+
+footer_reset() {
+  [ "$IS_TTY" = 1 ] || return
+  local lines; lines="$(tput lines)"
+  tput csr 0 $((lines - 1))
+  tput cup $((lines - 1)) 0
+  tput el
+}
+trap footer_reset EXIT INT TERM
+
+footer_draw() {
+  if [ "$IS_TTY" != 1 ]; then
+    printf '%s\n' "$1"
+    return
+  fi
+  local lines; lines="$(tput lines)"
+  tput sc
+  tput cup $((lines - 1)) 0
+  tput el
+  printf '%s' "$1"
+  tput rc
+}
+
 TOTAL_STEPS=4
 CURRENT_STEP=0
 progress() {
@@ -25,8 +63,9 @@ progress() {
   local empty=$((width - filled))
   local bar
   bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
-  printf '\n\033[1;32m[%s]\033[0m %3d%% - Step %d/%d: %s\n' \
-    "$bar" $((CURRENT_STEP * 100 / TOTAL_STEPS)) "$CURRENT_STEP" "$TOTAL_STEPS" "$1"
+  info "Step $CURRENT_STEP/$TOTAL_STEPS: $1"
+  footer_draw "$(printf '\033[1;32m[%s]\033[0m %3d%% - Step %d/%d: %s' \
+    "$bar" $((CURRENT_STEP * 100 / TOTAL_STEPS)) "$CURRENT_STEP" "$TOTAL_STEPS" "$1")"
 }
 
 case "$(uname -s)" in
@@ -116,6 +155,8 @@ check_default_shell() {
   fi
 }
 
+footer_init
+
 progress "Installing Homebrew"
 install_homebrew
 
@@ -128,8 +169,8 @@ symlink_dotfiles
 progress "Checking default shell"
 check_default_shell
 
-printf '\n\033[1;32m[%s]\033[0m 100%% - Done\n' "$(printf '%*s' 30 '' | tr ' ' '#')"
-info "Everything now lives under ~/.config - open a new terminal (or WezTerm window) to pick up the changes, no further action needed."
+footer_reset
+info "Done. Everything now lives under ~/.config - open a new terminal (or WezTerm window) to pick up the changes, no further action needed."
 if [ -d "$BACKUP_DIR" ]; then
   info "Pre-existing files were backed up to: $BACKUP_DIR"
 fi
