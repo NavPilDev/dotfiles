@@ -51,7 +51,7 @@ On Linux, Homebrew casks and the `vscode "..."` extension lines in
 [Brewfile](Brewfile) are macOS-only and get skipped automatically; everything
 else (formulae, taps, npm globals) installs the same way via Linuxbrew.
 
-### Windows
+### Windows (Powershell)
 
 Open **PowerShell** — not Command Prompt; `$env:USERPROFILE` below is
 PowerShell-only syntax and cmd.exe will create a folder literally named
