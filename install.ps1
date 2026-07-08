@@ -30,6 +30,15 @@ $ConfigHome = Join-Path $env:USERPROFILE ".config"
 function Info($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 function Warn($msg) { Write-Host "!! $msg" -ForegroundColor Yellow }
 
+$TotalSteps = 3
+$script:CurrentStep = 0
+function Step($label) {
+    $script:CurrentStep++
+    $pct = [int](($script:CurrentStep / $TotalSteps) * 100)
+    Write-Progress -Id 0 -Activity "Dotfiles setup" -Status "[$($script:CurrentStep)/$TotalSteps] $label" -PercentComplete $pct
+    Info "[$($script:CurrentStep)/$TotalSteps] $label"
+}
+
 function Test-Admin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -78,11 +87,13 @@ function Install-Packages {
         "wez.wezterm",
         "Yarn.Yarn",
         "pyenv-win.pyenv-win",
-        "DEVCOM.JetBrainsMonoNerdFont",
-        "Microsoft.VisualStudioCode"
+        "DEVCOM.JetBrainsMonoNerdFont"
     )
 
-    foreach ($pkg in $packages) {
+    for ($i = 0; $i -lt $packages.Count; $i++) {
+        $pkg = $packages[$i]
+        $pkgPct = [int]((($i + 1) / $packages.Count) * 100)
+        Write-Progress -Id 1 -ParentId 0 -Activity "Installing packages" -Status "$pkg ($($i + 1)/$($packages.Count))" -PercentComplete $pkgPct
         Info "winget install $pkg"
         try {
             winget install --id $pkg -e --source winget --accept-package-agreements --accept-source-agreements
@@ -90,6 +101,7 @@ function Install-Packages {
             Warn "Failed to install $pkg (it may already be installed, or the winget id may have changed - try 'winget search <name>'). $_"
         }
     }
+    Write-Progress -Id 1 -Activity "Installing packages" -Completed
 
     if (Get-Command code -ErrorAction SilentlyContinue) {
         Info "Installing VS Code extensions from Brewfile"
@@ -140,9 +152,16 @@ if (-not (Test-Admin)) {
     Warn "Not running as Administrator. Symlink creation will fail unless Developer Mode is enabled (Settings > Update & Security > For developers)."
 }
 
+Step "Setting XDG_CONFIG_HOME"
 Set-XdgConfigHome
+
+Step "Installing packages via winget"
 Install-Packages
+
+Step "Symlinking dotfiles"
 Set-Symlinks
+
+Write-Progress -Id 0 -Activity "Dotfiles setup" -Completed
 
 Info "Done. Everything now lives under $ConfigHome - open a new terminal (or WezTerm window) to pick up the changes, no further action needed."
 Info "Note: .zshrc, zsh-autosuggestions, zsh-syntax-highlighting and tmux are POSIX-shell tools and are not set up here. Use WSL + install.sh if you want those too."

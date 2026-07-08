@@ -92,6 +92,11 @@ cd ~/.dotfiles
 
 ## What the scripts do
 
+Both installers print an overall progress bar (`install.sh`: a step counter
+in the terminal; `install.ps1`: a native PowerShell progress bar, plus a
+nested one for the winget package loop) so you can tell where setup is at
+without reading through the package-manager output.
+
 Both installers are idempotent and safe to re-run:
 
 - Any **legacy** config still sitting at the old, non-XDG path

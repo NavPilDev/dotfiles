@@ -16,6 +16,19 @@ BACKUP_DIR="$HOME/.dotfiles-backup/$(date +%Y%m%d-%H%M%S)"
 info() { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33m!!\033[0m %s\n' "$1"; }
 
+TOTAL_STEPS=4
+CURRENT_STEP=0
+progress() {
+  CURRENT_STEP=$((CURRENT_STEP + 1))
+  local width=30
+  local filled=$((CURRENT_STEP * width / TOTAL_STEPS))
+  local empty=$((width - filled))
+  local bar
+  bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' "$empty" '' | tr ' ' '-')"
+  printf '\n\033[1;32m[%s]\033[0m %3d%% - Step %d/%d: %s\n' \
+    "$bar" $((CURRENT_STEP * 100 / TOTAL_STEPS)) "$CURRENT_STEP" "$TOTAL_STEPS" "$1"
+}
+
 case "$(uname -s)" in
   Darwin) PLATFORM="macos" ;;
   Linux) PLATFORM="linux" ;;
@@ -56,7 +69,6 @@ install_homebrew() {
 }
 
 install_packages() {
-  install_homebrew
   if [ "$PLATFORM" = "macos" ]; then
     info "Installing packages from Brewfile (brew formulae, casks, VS Code extensions)"
     brew bundle --file="$DOTFILES_DIR/Brewfile" \
@@ -104,11 +116,20 @@ check_default_shell() {
   fi
 }
 
+progress "Installing Homebrew"
+install_homebrew
+
+progress "Installing packages from Brewfile"
 install_packages
+
+progress "Symlinking dotfiles into ~/.config"
 symlink_dotfiles
+
+progress "Checking default shell"
 check_default_shell
 
-info "Done. Everything now lives under ~/.config - open a new terminal (or WezTerm window) to pick up the changes, no further action needed."
+printf '\n\033[1;32m[%s]\033[0m 100%% - Done\n' "$(printf '%*s' 30 '' | tr ' ' '#')"
+info "Everything now lives under ~/.config - open a new terminal (or WezTerm window) to pick up the changes, no further action needed."
 if [ -d "$BACKUP_DIR" ]; then
   info "Pre-existing files were backed up to: $BACKUP_DIR"
 fi
